@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { translateText, translateMessage } from "../utilities/api";
 
 function MainComponent() {
   const [showSplash, setShowSplash] = React.useState(true);
@@ -306,18 +307,14 @@ function MainComponent() {
     },
   ];
 
-  const handleTranslate = () => {
+  const handleTranslate = async () => {
     if (!inputText.trim()) return;
-
-    // Simulate translation (you'll need to integrate with a translation API)
-    const mockTranslation = `[${toLanguage} translation of: ${inputText}]`;
-    setTranslatedText(mockTranslation);
-
-    // Add to history
+    const translations = await translateText({ inputText, fromLanguage, toLanguage });
+    setTranslatedText(translations);
     const newTranslation = {
       id: Date.now(),
       original: inputText,
-      translated: mockTranslation,
+      translated: translations,
       from: fromLanguage,
       to: toLanguage,
       timestamp: new Date().toLocaleDateString(),
@@ -325,24 +322,11 @@ function MainComponent() {
     setTranslationHistory([newTranslation, ...translationHistory]);
   };
 
-  const translateMessage = (messageId, messageText, fromLang) => {
-    // Mock translation - in real app, use translation API
-    const translations = {
-      "Hello, how are you? 😊 (excited/happy)":
-        "こんにちは、元気ですか？😊 (興奮/幸せ)",
-      "I'm doing well! I just moved into my new apartment and am currently looking for a job. Are in you in town this week?":
-        "元気にやっています！新しいアパートに引っ越したばかりで、現在仕事を探しています。今週は街にいますか？",
-      "¡Hola! ¿Cómo estás?": "Hello! How are you?",
-      "¿Quieres ir al restaurante nuevo?":
-        "Do you want to go to the new restaurant?",
-    };
-
-    const translated =
-      translations[messageText] ||
-      `[Translated from ${fromLang}]: ${messageText}`;
+  const handleTranslateMessage = async (messageId, messageText, fromLang) => {
+    const translations = await translateMessage({ messageText, fromLang, toLanguage });
     setTranslatedMessages((prev) => ({
       ...prev,
-      [messageId]: translated,
+      [messageId]: translations,
     }));
   };
 
@@ -371,9 +355,9 @@ function MainComponent() {
   }
 
   const renderHomePage = () => (
-    <div className="flex-1 p-4 space-y-6">
+    <div className="flex-1 p-4 space-y-6 flex flex-col overflow-hidden min-h-0">
       {/* Translation Box */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-6 mb-4" style={{ flex: '0 0 auto' }}>
         {/* Language Selection */}
         <div className="flex items-center justify-between mb-4">
           <select
@@ -429,9 +413,11 @@ function MainComponent() {
             </button>
           </div>
 
-          {translatedText && (
+          {Array.isArray(translatedText) && translatedText.length > 0 && (
             <div className="p-4 bg-blue-50 rounded-xl">
-              <p className="text-blue-800">{translatedText}</p>
+              {translatedText.map((line, idx) => (
+                <p className="text-blue-800" key={idx}>{line}</p>
+              ))}
             </div>
           )}
 
@@ -445,11 +431,11 @@ function MainComponent() {
       </div>
 
       {/* Translation History */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-6 flex-1 min-h-0 flex flex-col overflow-y-auto">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
           Recent Translations
         </h3>
-        <div className="space-y-3 max-h-64 overflow-y-auto">
+        <div className="space-y-3 flex-1 min-h-0 overflow-y-auto hide-scrollbar">
           {translationHistory.map((item) => (
             <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-start mb-1">
@@ -469,7 +455,7 @@ function MainComponent() {
 
   const renderChatList = () => (
     <div className="flex-1 p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-6 h-full">
+      <div className="bg-white rounded-2xl shadow-lg p-6 h-full overflow-y-auto min-h-0">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Chats</h2>
         <div className="space-y-3">
           {conversations.map((chat) => (
@@ -499,7 +485,7 @@ function MainComponent() {
     if (!selectedChat) return renderChatList();
 
     return (
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Chat Header */}
         <div className="bg-white shadow-sm p-4 flex items-center">
           <button
@@ -523,7 +509,7 @@ function MainComponent() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 p-4 space-y-4 overflow-y-auto bg-gradient-to-br from-purple-50 to-blue-50">
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto bg-gradient-to-br from-purple-50 to-blue-50 hide-scrollbar min-h-0">
           {selectedChat.messages.map((message) => (
             <div
               key={message.id}
@@ -560,13 +546,7 @@ function MainComponent() {
                 {message.sender === "them" && (
                   <div className="flex space-x-2 mt-2">
                     <button
-                      onClick={() =>
-                        translateMessage(
-                          message.id,
-                          message.text,
-                          message.originalLanguage
-                        )
-                      }
+                      onClick={() => handleTranslateMessage(message.id, message.text, message.originalLanguage)}
                       className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors"
                     >
                       see original translation
@@ -581,7 +561,13 @@ function MainComponent() {
                 )}
 
                 {/* Show translation if available */}
-                {translatedMessages[message.id] && (
+                {Array.isArray(translatedMessages[message.id]) ? (
+                  <div className="mt-2 p-2 bg-purple-50 rounded-lg text-sm text-purple-800">
+                    {translatedMessages[message.id].map((line, idx) => (
+                      <div key={idx}>{line}</div>
+                    ))}
+                  </div>
+                ) : (
                   <div className="mt-2 p-2 bg-purple-50 rounded-lg text-sm text-purple-800">
                     {translatedMessages[message.id]}
                   </div>
@@ -632,7 +618,7 @@ function MainComponent() {
 
   const renderCollectionsList = () => (
     <div className="flex-1 p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-6 h-full">
+      <div className="bg-white rounded-2xl shadow-lg p-6 h-full overflow-y-auto min-h-0">
         <div className="flex items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-800">
             Select a collection
@@ -675,7 +661,7 @@ function MainComponent() {
     if (!selectedCollection) return renderCollectionsList();
 
     return (
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
         {/* Collection Header */}
         <div className="bg-white shadow-sm p-4">
           <div className="flex items-center mb-2">
@@ -692,7 +678,7 @@ function MainComponent() {
         </div>
 
         {/* Phrases List */}
-        <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto hide-scrollbar min-h-0">
           {selectedCollection.phrases.map((phrase) => (
             <div
               key={phrase.id}
@@ -742,7 +728,7 @@ function MainComponent() {
   const renderCollectionsPage = () => renderCollectionView();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-blue-100 flex flex-col font-poppins">
+    <div className="h-screen overflow-hidden flex flex-col font-poppins">
       {/* Header */}
       <div className="bg-white shadow-sm p-4">
         <h1 className="text-2xl font-bold text-center bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
@@ -751,9 +737,11 @@ function MainComponent() {
       </div>
 
       {/* Main Content */}
-      {currentPage === "home" && renderHomePage()}
-      {currentPage === "chat" && renderChatPage()}
-      {currentPage === "collections" && renderCollectionsPage()}
+      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-purple-100 to-blue-100">
+        {currentPage === "home" && renderHomePage()}
+        {currentPage === "chat" && renderChatPage()}
+        {currentPage === "collections" && renderCollectionsPage()}
+      </div>
 
       {/* Bottom Navigation */}
       <div className="bg-white border-t border-gray-200 px-4 py-2">
