@@ -1,7 +1,7 @@
 // Gemini translation API utilities
 
-const GEMINI_API_KEY = "AIzaSyBX9gX0FbBsY3mUE4K99Ax9eE0Z4RWdgug";
-const GEMINI_MODEL = "gemini-2.5-flash"; // or "gemini-2.5-pro"
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 function buildPrompt({ inputText, fromLanguage, toLanguage }) {
   return `You are a helpful translation assistant. Translate the following text from ${fromLanguage} to ${toLanguage}.
