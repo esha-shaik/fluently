@@ -4,16 +4,14 @@ const GEMINI_API_KEY = "AIzaSyBX9gX0FbBsY3mUE4K99Ax9eE0Z4RWdgug";
 const GEMINI_MODEL = "gemini-2.5-flash"; // or "gemini-2.5-pro"
 
 function buildPrompt({ inputText, fromLanguage, toLanguage }) {
-  return `Translate the following text from ${fromLanguage} to ${toLanguage}.
+  return `You are a helpful translation assistant. Translate the following text from ${fromLanguage} to ${toLanguage}.
 Return ONLY a JSON object with these fields:
 - translation: the translated text
-- pronunciation: the pronunciation of the translation in Latin script
+- pronunciation: the pronunciation in Latin script (if applicable)
 - detected_language: the detected source language (if auto-detect is used, otherwise repeat the source language)
-- literal_translation: a literal translation if it differs from the main translation, otherwise null
 - part_of_speech: the part of speech of the main word/phrase, or null
-- grammar_notes: a brief note about grammar or usage, or null
-- example_usage: an example sentence using the translation, or null
-- synonyms: a list of up to 3 synonyms for the translation, or null
+- example_usage: a short, natural example sentence using the translation, or null
+- synonyms: a list of up to 2 common synonyms for the translation, or null
 Text: ${inputText}`;
 }
 
