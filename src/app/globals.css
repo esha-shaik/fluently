@@ -18,6 +18,14 @@
   animation: slideup 0.4s cubic-bezier(.4,1.7,.6,.97);
 }
 
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fade-in {
+  animation: fade-in 0.5s ease;
+}
+
 /* Hide scrollbars for card containers and lists */
 .hide-scrollbar {
   scrollbar-width: none; /* Firefox */
