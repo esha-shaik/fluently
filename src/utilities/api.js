@@ -54,4 +54,36 @@ export async function translateText({ inputText, fromLanguage, toLanguage }) {
 
 export async function translateMessage({ messageText, fromLang, toLanguage }) {
   return translateText({ inputText: messageText, fromLanguage: fromLang || 'auto', toLanguage });
+}
+
+/**
+ * Send a chat message to Gemini and get a reply in the target language.
+ * @param {Object} params
+ * @param {string} params.message - The user's message
+ * @param {string} params.language - The language Gemini should reply in
+ * @returns {Promise<string>} The reply text
+ */
+export async function sendChatMessage({ message, language }) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const prompt = `You are a friendly chat partner. Reply to the following message in a natural, conversational way, in ${language}. Do not translate, just reply as if you are chatting. Only return the reply text, no JSON or extra formatting.\nMessage: ${message}`;
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }]
+      }
+    ]
+  };
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return reply.trim();
+  } catch (err) {
+    return '[Error getting response]';
+  }
 } 
