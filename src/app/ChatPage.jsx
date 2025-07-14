@@ -21,12 +21,15 @@ async function getReplyAndTranslation({ message, chatLanguage, userName }) {
     });
     const data = await response.json();
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('Gemini raw response:', raw); // <-- LOG RAW RESPONSE
     try {
       const jsonStart = raw.indexOf('{');
       const jsonEnd = raw.lastIndexOf('}');
       if (jsonStart !== -1 && jsonEnd !== -1) {
         const jsonString = raw.substring(jsonStart, jsonEnd + 1);
-        return JSON.parse(jsonString);
+        const parsed = JSON.parse(jsonString);
+        console.log('Gemini parsed details:', parsed); // <-- LOG PARSED DETAILS
+        return parsed;
       }
       return { reply: raw, translation: '' };
     } catch (e) {
@@ -43,8 +46,6 @@ function ChatPage({
   setSelectedChat,
   newMessage,
   setNewMessage,
-  translatedMessages,
-  setTranslatedMessages,
   handleTranslateMessage,
 }) {
   const [chatMessages, setChatMessages] = useState(selectedChat ? selectedChat.messages : []);
@@ -64,11 +65,11 @@ function ChatPage({
   const [showTranslation, setShowTranslation] = useState({});
   // At the top, add state for tracking translation fetching per message
   const [fetchingTranslation, setFetchingTranslation] = useState({});
-  // At the top, add state for toggling details per message
-  const [showDetails, setShowDetails] = useState({});
   const messagesEndRef = useRef(null);
   // At the top, add state for managing conversations if not already present
   const [allConversations, setAllConversations] = useState(conversations || []);
+  // At the top, add state for showing translation details for a message
+  const [showDetailsForMessageId, setShowDetailsForMessageId] = useState(null);
 
   React.useEffect(() => {
     if (selectedChat) {
@@ -81,7 +82,7 @@ function ChatPage({
     chatMessages.forEach((msg) => {
       if (
         msg.sender === "them" &&
-        (!translatedMessages[msg.id] || translatedMessages[msg.id].auto !== true)
+        (!msg.translationDetails || !msg.translationDetails.auto)
       ) {
         // Only auto-translate if not already translated and not English
         // We'll use Gemini to detect language, but for now, always auto-translate to English
@@ -97,16 +98,12 @@ function ChatPage({
       if (
         msg.sender === 'them' &&
         !msg.translation &&
-        (!translatedMessages[msg.id] || !translatedMessages[msg.id].English || !translatedMessages[msg.id].English.translation)
+        (!msg.translationDetails || !msg.translationDetails.English || !msg.translationDetails.English.translation)
       ) {
         translateText({ inputText: msg.text, fromLanguage: 'auto', toLanguage: 'English' }).then(result => {
-          setTranslatedMessages(prev => ({
-            ...prev,
-            [msg.id]: {
-              ...prev[msg.id],
-              English: { translation: result.translation || '' },
-            },
-          }));
+          setChatMessages(prev => prev.map(m =>
+            m.id === msg.id ? { ...m, translation: result.translation || '', translationDetails: { ...m.translationDetails, English: { translation: result.translation || '' } } } : m
+          ));
         });
       }
     });
@@ -117,10 +114,9 @@ function ChatPage({
   const handleAutoTranslateMessage = async (messageId, messageText, fromLang, auto = false) => {
     // Always translate to English for auto-translation
     const result = await translateText({ inputText: messageText, fromLanguage: 'auto', toLanguage: 'English' });
-    setTranslatedMessages((prev) => ({
-      ...prev,
-      [messageId]: { translation: result.translation || result.error || '', auto },
-    }));
+    setChatMessages(prev => prev.map(m =>
+      m.id === messageId ? { ...m, translation: result.translation || result.error || '', translationDetails: { ...m.translationDetails, English: { translation: result.translation || '' } } } : m
+    ));
   };
 
   // Close emoji picker on click outside
@@ -181,6 +177,7 @@ function ChatPage({
     setTimeout(async () => {
       // Get both reply and translation in one call
       const geminiDetails = await getReplyAndTranslation({ message: userMsg.text, chatLanguage, userName: selectedChat.name });
+      console.log('Gemini details used in chat:', geminiDetails); // <-- LOG DETAILS USED
       const { reply, ...details } = geminiDetails;
       const botMsg = {
         id: Date.now() + 1,
@@ -188,6 +185,7 @@ function ChatPage({
         sender: "them",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         translation: details.translation || '',
+        translationDetails: details, // <-- Store all details here
       };
       setChatMessages((prev) => [...prev, botMsg]);
       setAllConversations(prev => prev.map(conv =>
@@ -195,13 +193,6 @@ function ChatPage({
           ? { ...conv, messages: [...conv.messages, botMsg], lastMessage: botMsg.text, time: botMsg.timestamp }
           : conv
       ));
-      setTranslatedMessages((prev) => ({
-        ...prev,
-        [botMsg.id]: {
-          ...prev[botMsg.id],
-          English: { ...details },
-        },
-      }));
       setTyping(false); // Only turn off typing when the message is ready
       setSending(false);
     }, delay);
@@ -372,150 +363,195 @@ function ChatPage({
 
         {/* Messages - scrollable, fills available space, with bottom padding for input/nav */}
         <div className="flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full pb-40" style={{scrollBehavior:'smooth'}}>
-          {chatMessages.map((message, idx) => {
-            const isMe = message.sender === "me";
-            const isSender = !isMe;
-            // Ensure translation is available for new bot replies
-            if (
-              isSender &&
-              message.translation &&
-              (!translatedMessages[message.id] || !translatedMessages[message.id].English)
-            ) {
-              setTranslatedMessages(prev => ({
-                ...prev,
-                [message.id]: {
-                  ...prev[message.id],
-                  English: { translation: message.translation },
-                },
-              }));
-            }
-            // Remove per-message translation language dropdown and related state/logic
-            // At the top, remove messageLangs state
-            // Remove translateToLanguage and showLangPicker from the top-level state
-            // Remove showOriginal state and button logic for toggling translation
-            // In the message rendering loop, determine if translation is shown for this message
-            const isTranslationShown = !!showTranslation[message.id];
-            const translationObj = translatedMessages[message.id]?.['English'];
-            const isFetching = !!fetchingTranslation[message.id];
-            const shouldShowTranslation = isSender && !!translationObj && !!translationObj.translation;
-            // In the message rendering loop, extract details from translationObj
-            const details = translationObj || {};
-            // Remove showTranslationNow state and button logic for toggling translation
-            return (
-              <div
-                key={message.id}
-                className={`flex flex-col items-end ${isMe ? "justify-end" : "justify-start"} w-full animate-fade-in`}
-              >
-                <div className={`flex items-end ${isMe ? "justify-end" : "justify-start"} w-full`}>
-                  {!isMe && (
-                    <img
-                      src={`https://api.dicebear.com/7.x/personas/svg?seed=${selectedChat.name}`}
-                      alt="avatar"
-                      className="w-9 h-9 rounded-full mr-2 border border-gray-200 shadow-sm"
-                    />
-                  )}
-                  <div className={`flex flex-col max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
-                    <div
-                      className={`relative px-4 py-2 rounded-2xl shadow transition-all duration-200 text-base break-words ${
-                        isMe
-                          ? "bg-blue-500 text-white rounded-br-md"
-                          : "bg-white text-gray-900 border border-blue-100 rounded-bl-md"
-                      }`}
-                      title={message.timestamp}
-                    >
-                      {/* Show original by default, translation only if toggled */}
-                      {isSender && shouldShowTranslation && isTranslationShown
-                        ? translationObj.translation
-                        : message.text}
-                      {/* Bubble tail */}
-                      <span
-                        className={`absolute bottom-0 ${isMe ? "right-0" : "left-0"} w-3 h-3 ${isMe ? "bg-blue-500" : "bg-white border-blue-100 border-b border-l"} rounded-bl-2xl rounded-br-2xl transform translate-y-1/2 ${isMe ? "-mr-1" : "-ml-1"}`}
-                        style={{ zIndex: 0 }}
-                      ></span>
-                    </div>
-                    <span className="text-[11px] text-gray-400 mt-1 px-1">{message.timestamp}</span>
-                    {/* Sender message actions */}
-                    {isSender && (
-                      <div className="flex gap-2 mt-1">
-                        <button
-                          className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors flex items-center gap-1 disabled:opacity-60"
-                          disabled={isFetching}
-                          onClick={async () => {
-                            if (!translationObj) {
-                              setFetchingTranslation(prev => ({ ...prev, [message.id]: true }));
-                              const result = await translateText({
-                                inputText: message.text,
-                                fromLanguage: 'auto',
-                                toLanguage: 'English',
-                              });
-                              setTranslatedMessages(prev => ({
-                                ...prev,
-                                [message.id]: {
-                                  ...prev[message.id],
-                                  English: { translation: result.translation || '' },
-                                },
-                              }));
-                              setShowTranslation(prev => ({ ...prev, [message.id]: true }));
-                              setFetchingTranslation(prev => ({ ...prev, [message.id]: false }));
-                            } else {
-                              setShowTranslation(prev => ({ ...prev, [message.id]: !prev[message.id] }));
-                            }
-                          }}
-                        >
-                          {isFetching ? (
-                            <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                          ) : isTranslationShown ? "See Original" : "See Translation"}
-                        </button>
-                        <button
-                          className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors flex items-center gap-1"
-                          onClick={() => setShowDetails(prev => ({ ...prev, [message.id]: !prev[message.id] }))}
-                        >
-                          {showDetails[message.id] ? "Hide Details" : "See Details"}
-                        </button>
-                        <button
-                          className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors"
-                          onClick={() => alert('TODO: Add to collection')}
-                        >
-                          Add to Collection
-                        </button>
+          {/* Show filler content when no messages */}
+          {chatMessages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full space-y-6 py-12 mt-18 md:mt-20">
+              {/* Simple welcome message */}
+              <div className="text-center space-y-3">
+                <h3 className="text-xl font-semibold text-gray-800">Start a conversation with {selectedChat.name}</h3>
+                
+              </div>
+
+              {/* Simple tips */}
+              <div className="max-w-md bg-blue-50 border border-blue-200 rounded-xl p-5 text-center">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Quick tips:</h4>
+                <ul className="space-y-1 text-xs text-gray-600">
+                  <li>• Try responding in {chatLanguage}</li>
+                  <li>• Use the translate button to understand new words</li>
+                  <li>• Ask questions to keep the conversation going</li>
+                </ul>
+              </div>
+            </div>
+          ) : (
+            // Existing message rendering logic
+            chatMessages.map((message, idx) => {
+              const isMe = message.sender === "me";
+              const isSender = !isMe;
+              // Ensure translation is available for new bot replies
+              if (
+                isSender &&
+                message.translation &&
+                (!message.translationDetails || !message.translationDetails.English)
+              ) {
+                setChatMessages(prev => prev.map(m =>
+                  m.id === message.id ? { ...m, translationDetails: { ...m.translationDetails, English: { translation: message.translation } } } : m
+                ));
+              }
+              // Remove per-message translation language dropdown and related state/logic
+              // At the top, remove messageLangs state
+              // Remove translateToLanguage and showLangPicker from the top-level state
+              // Remove showOriginal state and button logic for toggling translation
+              // In the message rendering loop, determine if translation is shown for this message
+              const isTranslationShown = !!showTranslation[message.id];
+              const translationObj = message.translationDetails || {};
+              const isFetching = !!fetchingTranslation[message.id];
+              const shouldShowTranslation = isSender && !!translationObj && !!translationObj.translation;
+              // In the message rendering loop, extract details from translationObj
+              const details = translationObj || {};
+              // Remove showTranslationNow state and button logic for toggling translation
+              return (
+                <div
+                  key={message.id}
+                  className={`flex flex-col items-end ${isMe ? "justify-end" : "justify-start"} w-full animate-fade-in`}
+                >
+                  <div className={`flex items-start ${isMe ? "justify-end" : "justify-start"} w-full`}>
+                    {!isMe && (
+                      <img
+                        src={`https://api.dicebear.com/7.x/personas/svg?seed=${selectedChat.name}`}
+                        alt="avatar"
+                        className="w-9 h-9 rounded-full mr-2 border border-gray-200 shadow-sm"
+                      />
+                    )}
+                    <div className={`flex flex-col max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`relative px-4 py-2 rounded-2xl shadow transition-all duration-200 text-base break-words ${
+                          isMe
+                            ? "bg-blue-500 text-white rounded-br-md"
+                            : "bg-white text-gray-900 border border-blue-100 rounded-bl-md"
+                        }`}
+                        title={message.timestamp}
+                      >
+                        {/* Show original by default, translation only if toggled */}
+                        {isSender && shouldShowTranslation && isTranslationShown
+                          ? translationObj.translation
+                          : message.text}
+                        {/* Bubble tail */}
+                        <span
+                          className={`absolute bottom-0 ${isMe ? "right-0" : "left-0"} w-3 h-3 ${isMe ? "bg-blue-500" : "bg-white border-blue-100 border-b border-l"} rounded-bl-2xl rounded-br-2xl transform translate-y-1/2 ${isMe ? "-mr-1" : "-ml-1"}`}
+                          style={{ zIndex: 0 }}
+                        ></span>
                       </div>
+                      {/* Message actions - for both user and bot messages */}
+                      <div className="flex gap-1.5 mt-2 px-1 justify-end">
+                        {isSender && (
+                          <>
+                            <button
+                              className="text-xs bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:shadow-sm transition-all duration-200 flex items-center gap-1.5 disabled:opacity-60 font-medium"
+                              disabled={isFetching}
+                              onClick={async () => {
+                                if (!translationObj) {
+                                  setFetchingTranslation(prev => ({ ...prev, [message.id]: true }));
+                                  const result = await translateText({
+                                    inputText: message.text,
+                                    fromLanguage: 'auto',
+                                    toLanguage: 'English',
+                                  });
+                                  setChatMessages(prev => prev.map(m =>
+                                    m.id === message.id ? { ...m, translation: result.translation || '', translationDetails: { ...m.translationDetails, English: { translation: result.translation || '' } } } : m
+                                  ));
+                                  setShowTranslation(prev => ({ ...prev, [message.id]: true }));
+                                  setFetchingTranslation(prev => ({ ...prev, [message.id]: false }));
+                                } else {
+                                  setShowTranslation(prev => ({ ...prev, [message.id]: !prev[message.id] }));
+                                }
+                              }}
+                            >
+                              {isFetching ? (
+                                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                              ) : (
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
+                              )}
+                              {isTranslationShown ? "Original" : "Translate"}
+                            </button>
+                            {translationObj && Object.keys(translationObj).length > 0 && (
+                              <button
+                                className="text-xs bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
+                                onClick={() => setShowDetailsForMessageId(showDetailsForMessageId === message.id ? null : message.id)}
+                              >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                {showDetailsForMessageId === message.id ? 'Hide' : 'Details'}
+                              </button>
+                            )}
+                            <button
+                              className="text-xs bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
+                              onClick={() => alert('TODO: Add to collection')}
+                            >
+                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                              Save
+                            </button>
+                          </>
+                        )}
+                        {!isSender && translationObj && Object.keys(translationObj).length > 0 && (
+                          <button
+                            className="text-xs bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
+                            onClick={() => setShowDetailsForMessageId(showDetailsForMessageId === message.id ? null : message.id)}
+                          >
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            {showDetailsForMessageId === message.id ? 'Hide' : 'Details'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {/* Timestamp positioned outside on the right, aligned with message bubble */}
+                    <div className={`ml-2 text-[10px] text-gray-500 opacity-70 ${isMe ? 'order-first mr-2' : ''}`} style={{ marginTop: '14px' }}>
+                      {message.timestamp}
+                    </div>
+                    {isMe && (
+                      <img
+                        src="https://api.dicebear.com/7.x/personas/svg?seed=me"
+                        alt="me"
+                        className="w-9 h-9 rounded-full ml-2 border border-gray-200 shadow-sm"
+                      />
                     )}
                   </div>
-                  {isMe && (
-                    <img
-                      src="https://api.dicebear.com/7.x/personas/svg?seed=me"
-                      alt="me"
-                      className="w-9 h-9 rounded-full ml-2 border border-gray-200 shadow-sm"
-                    />
+                  {/* Translation details panel - improved UI */}
+                  {translationObj && Object.keys(translationObj).length > 0 && showDetailsForMessageId === message.id && (
+                    <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-50 border border-blue-200 rounded-2xl shadow-lg max-w-md relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-500"></div>
+                      <div className="space-y-3">
+                        {translationObj.tone_of_speech && (
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-blue-600 text-sm">🎭</span>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Tone</div>
+                              <div className="text-sm text-gray-800 font-medium">{translationObj.tone_of_speech}</div>
+                            </div>
+                          </div>
+                        )}
+                        {translationObj.cultural_notes && (
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                              <span className="text-purple-600 text-sm">🌍</span>
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Cultural Context</div>
+                              <div className="text-sm text-gray-800">{translationObj.cultural_notes}</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-                {/* Under the message bubble, show the details panel if toggled */}
-                {isSender && showDetails[message.id] && (
-                  <div className="mt-2 mb-1 px-4 py-3 rounded-xl bg-blue-50 border-l-4 border-blue-400 shadow text-sm text-gray-800 max-w-md flex flex-col gap-2">
-                    <div className="mb-1 font-semibold text-blue-700 flex items-center gap-2"><span className="material-icons text-blue-400">info</span> Translation Details</div>
-                    {details.tone_of_speech && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">emoji_emotions</span><span className="font-medium">Tone:</span> {details.tone_of_speech}</div>}
-                    {details.part_of_speech && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">category</span><span className="font-medium">Part of Speech:</span> {details.part_of_speech}</div>}
-                    {details.pronunciation && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">record_voice_over</span><span className="font-medium">Pronunciation:</span> {details.pronunciation}</div>}
-                    {details.detected_language && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">language</span><span className="font-medium">Detected Language:</span> {details.detected_language}</div>}
-                    {details.example_usage && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">chat_bubble</span><span className="font-medium">Example Usage:</span> {details.example_usage}</div>}
-                    {details.synonyms && Array.isArray(details.synonyms) && details.synonyms.length > 0 && (
-                      <div className="flex items-center gap-2"><span className="material-icons text-blue-400">sync_alt</span><span className="font-medium">Synonyms:</span> {details.synonyms.join(', ')}</div>
-                    )}
-                    {details.cultural_notes && (
-                      <div className="flex items-center gap-2"><span className="material-icons text-blue-400">public</span><span className="font-medium">Cultural Notes:</span> {details.cultural_notes}</div>
-                    )}
-                    {!(details.tone_of_speech || details.part_of_speech || details.pronunciation || details.detected_language || details.example_usage || (details.synonyms && details.synonyms.length > 0) || details.cultural_notes) && (
-                      <div className="italic text-gray-400">No extra details available.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
           <div ref={messagesEndRef} />
           {/* Typing indicator for bot reply */}
           {typing && chatMessages.length > 0 && chatMessages[chatMessages.length - 1].sender === "me" && (
-            <div className="flex items-center gap-2 mt-2 animate-pulse">
+            <div className="flex items-center gap-2 mt-1 animate-pulse">
               <img
                 src={`https://api.dicebear.com/7.x/personas/svg?seed=${selectedChat.name}`}
                 alt="avatar"
@@ -604,7 +640,7 @@ function ChatPage({
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [chatMessages]);
+  }, [chatMessages, typing]);
 
   // When selecting a chat, set chatMessages to the messages of the selected conversation from allConversations
   React.useEffect(() => {
