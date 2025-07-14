@@ -47,6 +47,9 @@ function ChatPage({
   newMessage,
   setNewMessage,
   handleTranslateMessage,
+  collections,
+  setShowSaveModal,
+  setMessageToSave,
 }) {
   const [chatMessages, setChatMessages] = useState(selectedChat ? selectedChat.messages : []);
   const [chatLanguage, setChatLanguage] = useState("Spanish");
@@ -236,9 +239,9 @@ function ChatPage({
     <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-purple-50 to-blue-100">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-screen-xl px-8 mx-auto my-8">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Chats</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Chats</h2>
           <button
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 sm:px-5 py-2 rounded-full shadow transition-colors text-base sm:text-lg font-semibold"
+            className="group relative flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 rounded-2xl shadow-lg transition-all duration-300 text-base font-semibold hover:from-indigo-700 hover:to-purple-700 hover:shadow-2xl hover:scale-105"
             onClick={() => {
               const name = prompt('Enter a name for the new conversation:');
               if (name && name.trim()) {
@@ -256,7 +259,7 @@ function ChatPage({
               }
             }}
           >
-            <span className="text-xl sm:text-2xl">＋</span> <span className="hidden xs:inline sm:inline">New Conversation</span><span className="inline xs:hidden sm:hidden">New</span>
+            <span className="text-xl group-hover:rotate-90 transition-transform duration-300">＋</span> <span className="hidden xs:inline sm:inline">New Conversation</span><span className="inline xs:hidden sm:hidden">New</span>
           </button>
         </div>
         <div className="space-y-6">
@@ -277,7 +280,7 @@ function ChatPage({
               />
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-1">
-                  <h3 className="font-semibold text-base sm:text-xl text-gray-800 truncate max-w-[100px] sm:max-w-none">{chat.name}</h3>
+                  <h3 className="font-semibold text-sm sm:text-lg text-gray-800 truncate max-w-[100px] sm:max-w-none">{chat.name}</h3>
                   <div className="flex items-center gap-2 sm:gap-4">
                     <span className="text-xs sm:text-sm text-gray-400 whitespace-nowrap">{chat.time}</span>
                     <button
@@ -294,7 +297,7 @@ function ChatPage({
                     </button>
                   </div>
                 </div>
-                <p className="text-xs sm:text-base text-gray-600 truncate">
+                <p className="text-xs sm:text-sm text-gray-600 truncate">
                   {chat.lastMessage || <span className="italic text-gray-400">No messages yet</span>}
                 </p>
               </div>
@@ -351,7 +354,7 @@ function ChatPage({
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-xl md:text-2xl text-gray-800 truncate">{selectedChat.name}</h2>
+              <h2 className="font-semibold text-lg md:text-xl text-gray-800 truncate">{selectedChat.name}</h2>
               {/* In the chat header, update 'Active now' to only show the green dot on mobile */}
               <span className="flex items-center gap-1 text-green-600 text-xs font-medium ml-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -368,12 +371,12 @@ function ChatPage({
             <div className="flex flex-col items-center justify-center h-full space-y-6 py-12 mt-18 md:mt-20">
               {/* Simple welcome message */}
               <div className="text-center space-y-3">
-                <h3 className="text-xl font-semibold text-gray-800">Start a conversation with {selectedChat.name}</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Start a conversation with {selectedChat.name}</h3>
                 
               </div>
 
               {/* Simple tips */}
-              <div className="max-w-md bg-blue-50 border border-blue-200 rounded-xl p-5 text-center">
+              <div className="max-w-md bg-blue-50 border border-blue-200 rounded-xl p-5 ">
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Quick tips:</h4>
                 <ul className="space-y-1 text-xs text-gray-600">
                   <li>• Try responding in {chatLanguage}</li>
@@ -484,7 +487,16 @@ function ChatPage({
                             )}
                             <button
                               className="text-xs bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
-                              onClick={() => alert('TODO: Add to collection')}
+                              onClick={() => {
+                                setMessageToSave({
+                                  text: message.text,
+                                  translation: message.translation,
+                                  originalLanguage: message.originalLanguage || chatLanguage,
+                                  translationDetails: message.translationDetails,
+                                  sender: message.sender
+                                });
+                                setShowSaveModal(true);
+                              }}
                             >
                               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                               Save
