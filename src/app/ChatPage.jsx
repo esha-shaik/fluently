@@ -3,9 +3,8 @@ import { sendChatMessage, translateText } from "../utilities/api";
 
 // New helper to get both reply and translation in one Gemini call
 async function getReplyAndTranslation({ message, chatLanguage, userName }) {
-  // Custom prompt to Gemini: reply in chatLanguage, also provide English translation
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`;
-  const prompt = `You are roleplaying as a friendly, engaging chat partner named ${userName}. Your persona: you are a witty, curious, and supportive friend who loves learning about the world and helping others practice languages. Reply to the following message in a natural, conversational way, in ${chatLanguage}. Make your reply short and concise (1-2 sentences), but still interesting. Ask a follow-up question and keep the conversation going. Then, provide the English translation of your reply.\nReturn ONLY a JSON object with these fields:\n- reply: your reply in ${chatLanguage}\n- translation: your reply translated to English\nMessage: ${message}`;
+  const prompt = `You are roleplaying as a friendly, engaging chat partner named ${userName}. Your persona: you are a witty, curious, and supportive friend who loves learning about the world and helping others practice languages. Reply to the following message in a natural, conversational way, in ${chatLanguage}. Make your reply short and concise (1-2 sentences), but still interesting. Ask a follow-up question and keep the conversation going.\n\nIMPORTANT: RETURN ONLY A JSON OBJECT WITH ALL OF THE FOLLOWING FIELDS, EVEN IF SOME ARE NULL OR EMPTY. DO NOT OMIT ANY FIELD. DO NOT ADD EXTRA TEXT OR EXPLANATION. IF YOU DON'T KNOW A VALUE, RETURN null OR AN EMPTY STRING, BUT ALWAYS INCLUDE EVERY FIELD.\n\nEXAMPLE OUTPUT:\n{\n  "reply": "...",\n  "translation": "...",\n  "tone_of_speech": "...",\n  "part_of_speech": "...",\n  "pronunciation": "...",\n  "detected_language": "...",\n  "example_usage": "...",\n  "synonyms": ["...", "..."],\n  "cultural_notes": "..."\n}\n\nFIELDS TO RETURN:\n- reply: your reply in ${chatLanguage}\n- translation: your reply translated to English\n- tone_of_speech: the tone of your reply (e.g. friendly, formal, playful, etc.)\n- part_of_speech: the part of speech of the main word/phrase, or null\n- pronunciation: the pronunciation in Latin script (if applicable)\n- detected_language: the detected source language (if auto-detect is used, otherwise repeat the source language)\n- example_usage: a short, natural example sentence using the translation, or null\n- synonyms: a list of up to 2 common synonyms for the translation, or null\n- cultural_notes: any cultural meanings, differences, or useful context for the translation (if any, otherwise null)\nMessage: ${message}`;
   const body = {
     contents: [
       {
@@ -22,7 +21,6 @@ async function getReplyAndTranslation({ message, chatLanguage, userName }) {
     });
     const data = await response.json();
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    // Try to parse JSON from the response
     try {
       const jsonStart = raw.indexOf('{');
       const jsonEnd = raw.lastIndexOf('}');
@@ -66,6 +64,8 @@ function ChatPage({
   const [showTranslation, setShowTranslation] = useState({});
   // At the top, add state for tracking translation fetching per message
   const [fetchingTranslation, setFetchingTranslation] = useState({});
+  // At the top, add state for toggling details per message
+  const [showDetails, setShowDetails] = useState({});
   const messagesEndRef = useRef(null);
   // At the top, add state for managing conversations if not already present
   const [allConversations, setAllConversations] = useState(conversations || []);
@@ -180,13 +180,14 @@ function ChatPage({
     // Wait for the delay, then fetch the bot reply
     setTimeout(async () => {
       // Get both reply and translation in one call
-      const { reply, translation } = await getReplyAndTranslation({ message: userMsg.text, chatLanguage, userName: selectedChat.name });
+      const geminiDetails = await getReplyAndTranslation({ message: userMsg.text, chatLanguage, userName: selectedChat.name });
+      const { reply, ...details } = geminiDetails;
       const botMsg = {
         id: Date.now() + 1,
         text: reply,
         sender: "them",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        translation: translation || '',
+        translation: details.translation || '',
       };
       setChatMessages((prev) => [...prev, botMsg]);
       setAllConversations(prev => prev.map(conv =>
@@ -198,8 +199,7 @@ function ChatPage({
         ...prev,
         [botMsg.id]: {
           ...prev[botMsg.id],
-          English: { translation: translation || '' },
-          detected_language: chatLanguage,
+          English: { ...details },
         },
       }));
       setTyping(false); // Only turn off typing when the message is ready
@@ -398,6 +398,8 @@ function ChatPage({
             const translationObj = translatedMessages[message.id]?.['English'];
             const isFetching = !!fetchingTranslation[message.id];
             const shouldShowTranslation = isSender && !!translationObj && !!translationObj.translation;
+            // In the message rendering loop, extract details from translationObj
+            const details = translationObj || {};
             // Remove showTranslationNow state and button logic for toggling translation
             return (
               <div
@@ -465,6 +467,12 @@ function ChatPage({
                           ) : isTranslationShown ? "See Original" : "See Translation"}
                         </button>
                         <button
+                          className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors flex items-center gap-1"
+                          onClick={() => setShowDetails(prev => ({ ...prev, [message.id]: !prev[message.id] }))}
+                        >
+                          {showDetails[message.id] ? "Hide Details" : "See Details"}
+                        </button>
+                        <button
                           className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors"
                           onClick={() => alert('TODO: Add to collection')}
                         >
@@ -481,6 +489,26 @@ function ChatPage({
                     />
                   )}
                 </div>
+                {/* Under the message bubble, show the details panel if toggled */}
+                {isSender && showDetails[message.id] && (
+                  <div className="mt-2 mb-1 px-4 py-3 rounded-xl bg-blue-50 border-l-4 border-blue-400 shadow text-sm text-gray-800 max-w-md flex flex-col gap-2">
+                    <div className="mb-1 font-semibold text-blue-700 flex items-center gap-2"><span className="material-icons text-blue-400">info</span> Translation Details</div>
+                    {details.tone_of_speech && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">emoji_emotions</span><span className="font-medium">Tone:</span> {details.tone_of_speech}</div>}
+                    {details.part_of_speech && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">category</span><span className="font-medium">Part of Speech:</span> {details.part_of_speech}</div>}
+                    {details.pronunciation && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">record_voice_over</span><span className="font-medium">Pronunciation:</span> {details.pronunciation}</div>}
+                    {details.detected_language && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">language</span><span className="font-medium">Detected Language:</span> {details.detected_language}</div>}
+                    {details.example_usage && <div className="flex items-center gap-2"><span className="material-icons text-blue-400">chat_bubble</span><span className="font-medium">Example Usage:</span> {details.example_usage}</div>}
+                    {details.synonyms && Array.isArray(details.synonyms) && details.synonyms.length > 0 && (
+                      <div className="flex items-center gap-2"><span className="material-icons text-blue-400">sync_alt</span><span className="font-medium">Synonyms:</span> {details.synonyms.join(', ')}</div>
+                    )}
+                    {details.cultural_notes && (
+                      <div className="flex items-center gap-2"><span className="material-icons text-blue-400">public</span><span className="font-medium">Cultural Notes:</span> {details.cultural_notes}</div>
+                    )}
+                    {!(details.tone_of_speech || details.part_of_speech || details.pronunciation || details.detected_language || details.example_usage || (details.synonyms && details.synonyms.length > 0) || details.cultural_notes) && (
+                      <div className="italic text-gray-400">No extra details available.</div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
