@@ -270,59 +270,17 @@ function MainComponent() {
       id: 1,
       name: "Hana Yamamoto",
       avatar: "👩",
-      lastMessage: "I'm doing well! I just moved into my new apartment...",
-      time: "2:30 PM",
-      messages: [
-        {
-          id: 1,
-          text: "Hello, how are you? 😊 (excited/happy)",
-          sender: "them",
-          originalLanguage: "Japanese",
-          timestamp: "2:25 PM",
-        },
-        {
-          id: 2,
-          text: "Hi! I'm good, how are you doing?",
-          sender: "me",
-          timestamp: "2:28 PM",
-        },
-        {
-          id: 3,
-          text: "I'm doing well! I just moved into my new apartment and am currently looking for a job. Are in you in town this week?",
-          sender: "them",
-          originalLanguage: "Japanese",
-          timestamp: "2:30 PM",
-        },
-      ],
+      lastMessage: "",
+      time: "",
+      messages: [],
     },
     {
       id: 2,
       name: "Carlos Rodriguez",
       avatar: "👨",
-      lastMessage: "¿Quieres ir al restaurante nuevo?",
-      time: "1:15 PM",
-      messages: [
-        {
-          id: 1,
-          text: "¡Hola! ¿Cómo estás?",
-          sender: "them",
-          originalLanguage: "Spanish",
-          timestamp: "1:10 PM",
-        },
-        {
-          id: 2,
-          text: "Hi Carlos! I'm doing well, thanks!",
-          sender: "me",
-          timestamp: "1:12 PM",
-        },
-        {
-          id: 3,
-          text: "¿Quieres ir al restaurante nuevo?",
-          sender: "them",
-          originalLanguage: "Spanish",
-          timestamp: "1:15 PM",
-        },
-      ],
+      lastMessage: "",
+      time: "",
+      messages: [],
     },
   ];
 
@@ -416,6 +374,7 @@ function MainComponent() {
             newMessage={newMessage}
             setNewMessage={setNewMessage}
             translatedMessages={translatedMessages}
+            setTranslatedMessages={setTranslatedMessages}
             handleTranslateMessage={handleTranslateMessage}
           />
         )}
