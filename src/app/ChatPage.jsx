@@ -379,7 +379,7 @@ function ChatPage({
               <div className="max-w-md bg-blue-50 border border-blue-200 rounded-xl p-5 ">
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Quick tips:</h4>
                 <ul className="space-y-1 text-xs text-gray-600">
-                  <li>• Try responding in {chatLanguage}</li>
+                  <li>• The AI is using <strong>{chatLanguage}</strong> to respond</li>
                   <li>• Use the translate button to understand new words</li>
                   <li>• Ask questions to keep the conversation going</li>
                 </ul>
