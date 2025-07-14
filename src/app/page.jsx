@@ -45,35 +45,12 @@ function MainComponent() {
   const [selectedCollection, setSelectedCollection] = React.useState(null);
   const [showTranslationResult, setShowTranslationResult] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-
-  const languageFlags = {
-    "auto": "🌐",
-    "English": "🇬🇧",
-    "Spanish": "🇪🇸",
-    "French": "🇫🇷",
-    "German": "🇩🇪",
-    "Italian": "🇮🇹",
-    "Portuguese": "🇵🇹",
-    "Chinese": "🇨🇳",
-    "Japanese": "🇯🇵",
-    "Korean": "🇰🇷",
-    "Arabic": "🇸🇦",
-  };
-  const languages = [
-    "English",
-    "Spanish",
-    "French",
-    "German",
-    "Italian",
-    "Portuguese",
-    "Chinese",
-    "Japanese",
-    "Korean",
-    "Arabic",
-  ];
-  const fromLanguages = ["auto", ...languages];
-
-  const collections = [
+  const [showSaveModal, setShowSaveModal] = React.useState(false);
+  const [messageToSave, setMessageToSave] = React.useState(null);
+  const [showNewCollectionModal, setShowNewCollectionModal] = React.useState(false);
+  const [newCollectionName, setNewCollectionName] = React.useState("");
+  const [newCollectionDescription, setNewCollectionDescription] = React.useState("");
+  const [collections, setCollections] = React.useState([
     {
       id: 1,
       title: "Travel Phrases",
@@ -256,28 +233,183 @@ function MainComponent() {
         },
         {
           id: 8,
-          text: "¿Cómo se dice esto en español?",
+          text: "Buenas noches",
           language: "Spanish",
-          pronunciation: "KOH-moh seh DEY-seh ES-toh en es-pah-NYOHL",
-          english: "How do you say this in Spanish?",
+          pronunciation: "BWEH-nahs NOH-chehs",
+          english: "Good night",
         },
       ],
     },
+  ]);
+
+  // Load collections from localStorage on mount
+  React.useEffect(() => {
+    const savedCollections = localStorage.getItem('fluently_collections');
+    if (savedCollections) {
+      setCollections(JSON.parse(savedCollections));
+    }
+  }, []);
+
+  // Save collections to localStorage whenever they change
+  React.useEffect(() => {
+    localStorage.setItem('fluently_collections', JSON.stringify(collections));
+  }, [collections]);
+
+  // Collection management functions
+  const saveMessageToCollection = (message, collectionId) => {
+    setCollections(prev => prev.map(collection => {
+      if (collection.id === collectionId) {
+        const newPhrase = {
+          id: Date.now(),
+          text: message.text,
+          language: message.originalLanguage || "Spanish",
+          pronunciation: message.translationDetails?.pronunciation || "",
+          english: message.translation || message.text,
+          timestamp: new Date().toLocaleDateString(),
+          sender: message.sender
+        };
+        return {
+          ...collection,
+          phrases: [...collection.phrases, newPhrase]
+        };
+      }
+      return collection;
+    }));
+    setShowSaveModal(false);
+    setMessageToSave(null);
+  };
+
+  const createNewCollection = () => {
+    if (newCollectionName.trim()) {
+      const newCollection = {
+        id: Date.now(),
+        title: newCollectionName.trim(),
+        description: newCollectionDescription.trim() || "Collection of saved phrases",
+        phrases: []
+      };
+      setCollections(prev => [newCollection, ...prev]);
+      setNewCollectionName("");
+      setNewCollectionDescription("");
+      setShowNewCollectionModal(false);
+    }
+  };
+
+  const removeCollection = (collectionId) => {
+    setCollections(prev => prev.filter(collection => collection.id !== collectionId));
+    if (selectedCollection?.id === collectionId) {
+      setSelectedCollection(null);
+    }
+  };
+
+  const removePhraseFromCollection = (collectionId, phraseId) => {
+    setCollections(prev => prev.map(collection => {
+      if (collection.id === collectionId) {
+        return {
+          ...collection,
+          phrases: collection.phrases.filter(phrase => phrase.id !== phraseId)
+        };
+      }
+      return collection;
+    }));
+  };
+
+  const languageFlags = {
+    "auto": "🌐",
+    "English": "🇬🇧",
+    "Spanish": "🇪🇸",
+    "French": "🇫🇷",
+    "German": "🇩🇪",
+    "Italian": "🇮🇹",
+    "Portuguese": "🇵🇹",
+    "Chinese": "🇨🇳",
+    "Japanese": "🇯🇵",
+    "Korean": "🇰🇷",
+    "Arabic": "🇸🇦",
+  };
+  const languages = [
+    "English",
+    "Spanish",
+    "French",
+    "German",
+    "Italian",
+    "Portuguese",
+    "Chinese",
+    "Japanese",
+    "Korean",
+    "Arabic",
   ];
+  const fromLanguages = ["auto", ...languages];
 
   const conversations = [
     {
       id: 1,
       name: "Hana Yamamoto",
       avatar: "👩",
-      lastMessage: "",
-      time: "",
-      messages: [],
+      lastMessage: "¡Hasta luego!",
+      time: "2:30 PM",
+      messages: [
+        {
+          id: 1,
+          text: "¡Hola! ¿Cómo estás hoy?",
+          sender: "them",
+          timestamp: "2:15 PM",
+          translation: "Hello! How are you today?",
+          translationDetails: {
+            translation: "Hello! How are you today?",
+            tone_of_speech: "friendly",
+            cultural_notes: "A common greeting in Spanish-speaking countries"
+          }
+        },
+        {
+          id: 2,
+          text: "I'm doing well, thank you! How about you?",
+          sender: "me",
+          timestamp: "2:18 PM"
+        },
+        {
+          id: 3,
+          text: "¡Muy bien, gracias! ¿Qué tal tu día?",
+          sender: "them",
+          timestamp: "2:20 PM",
+          translation: "Very well, thank you! How was your day?",
+          translationDetails: {
+            translation: "Very well, thank you! How was your day?",
+            tone_of_speech: "friendly",
+            cultural_notes: "A polite way to ask about someone's day"
+          }
+        },
+        {
+          id: 4,
+          text: "It's been great! I'm learning Spanish.",
+          sender: "me",
+          timestamp: "2:25 PM"
+        },
+        {
+          id: 5,
+          text: "¡Excelente! Me alegra mucho escuchar eso. ¡Hasta luego!",
+          sender: "them",
+          timestamp: "2:30 PM",
+          translation: "Excellent! I'm very happy to hear that. See you later!",
+          translationDetails: {
+            translation: "Excellent! I'm very happy to hear that. See you later!",
+            tone_of_speech: "enthusiastic",
+            cultural_notes: "A warm and encouraging response"
+          }
+        }
+      ],
     },
     {
       id: 2,
       name: "Carlos Rodriguez",
       avatar: "👨",
+      lastMessage: "",
+      time: "",
+      messages: [],
+    },
+    {
+      id: 3,
+      name: "Maria Santos",
+      avatar: "👩‍🦰",
       lastMessage: "",
       time: "",
       messages: [],
@@ -376,6 +508,9 @@ function MainComponent() {
             translatedMessages={translatedMessages}
             setTranslatedMessages={setTranslatedMessages}
             handleTranslateMessage={handleTranslateMessage}
+            collections={collections}
+            setShowSaveModal={setShowSaveModal}
+            setMessageToSave={setMessageToSave}
           />
         )}
         {currentPage === "collections" && (
@@ -383,9 +518,114 @@ function MainComponent() {
             collections={collections}
             selectedCollection={selectedCollection}
             setSelectedCollection={setSelectedCollection}
+            createNewCollection={createNewCollection}
+            removeCollection={removeCollection}
+            removePhraseFromCollection={removePhraseFromCollection}
+            showNewCollectionModal={showNewCollectionModal}
+            setShowNewCollectionModal={setShowNewCollectionModal}
+            newCollectionName={newCollectionName}
+            setNewCollectionName={setNewCollectionName}
+            newCollectionDescription={newCollectionDescription}
+            setNewCollectionDescription={setNewCollectionDescription}
           />
         )}
       </div>
+
+      {/* Save Message Modal */}
+      {showSaveModal && messageToSave && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Save to Collection</h3>
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600 mb-2">Message to save:</p>
+              <p className="text-gray-800">{messageToSave.text}</p>
+              {messageToSave.translation && (
+                <p className="text-gray-600 text-sm mt-1">→ {messageToSave.translation}</p>
+              )}
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {collections.map((collection) => (
+                <button
+                  key={collection.id}
+                  onClick={() => saveMessageToCollection(messageToSave, collection.id)}
+                  className="w-full p-3 text-left border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                >
+                  <div className="font-medium text-gray-800">{collection.title}</div>
+                  <div className="text-sm text-gray-600">{collection.description}</div>
+                  <div className="text-xs text-gray-500 mt-1">{collection.phrases.length} phrases</div>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setMessageToSave(null);
+                }}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowNewCollectionModal(true)}
+                className="flex-1 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                New Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Collection Modal */}
+      {showNewCollectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Create New Collection</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Collection Name</label>
+                <input
+                  type="text"
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                  placeholder="Enter collection name"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
+                <textarea
+                  value={newCollectionDescription}
+                  onChange={(e) => setNewCollectionDescription(e.target.value)}
+                  placeholder="Enter description"
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowNewCollectionModal(false);
+                  setNewCollectionName("");
+                  setNewCollectionDescription("");
+                }}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createNewCollection}
+                disabled={!newCollectionName.trim()}
+                className="flex-1 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <div className="bg-white/90 border-t border-blue-200 shadow-lg px-4 py-2 fixed bottom-0 left-0 w-full z-50 backdrop-blur-md">
