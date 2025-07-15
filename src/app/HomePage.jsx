@@ -162,14 +162,20 @@ function HomePage({
                   <span className="text-xs text-gray-400">{item.timestamp}</span>
                 </div>
                 <div className="font-medium text-gray-800 mb-1">{item.original}</div>
-                {item.translated && !item.translated.error && (
+                {item.translated && typeof item.translated === 'object' && !item.translated.error && (
                   <div className="flex items-center gap-2 text-blue-800 font-semibold">
                     <span className="text-lg">🌍</span>
-                    <span>{item.translated.translation}</span>
+                    <span>{item.translated.translation || item.translated}</span>
                   </div>
                 )}
-                {item.translated && item.translated.error && (
+                {item.translated && typeof item.translated === 'object' && item.translated.error && (
                   <div className="text-red-600 text-xs">{item.translated.error}</div>
+                )}
+                {item.translated && typeof item.translated === 'string' && (
+                  <div className="flex items-center gap-2 text-blue-800 font-semibold">
+                    <span className="text-lg">🌍</span>
+                    <span>{item.translated}</span>
+                  </div>
                 )}
               </div>
             ))}
@@ -190,14 +196,20 @@ function HomePage({
                   <span className="text-xs text-gray-400">{item.timestamp}</span>
                 </div>
                 <div className="font-medium text-gray-800 mb-1">{item.original}</div>
-                {item.translated && !item.translated.error && (
+                {item.translated && typeof item.translated === 'object' && !item.translated.error && (
                   <div className="flex items-center gap-2 text-blue-800 font-semibold">
                     <span className="text-lg">🌍</span>
-                    <span>{item.translated.translation}</span>
+                    <span>{item.translated.translation || item.translated}</span>
                   </div>
                 )}
-                {item.translated && item.translated.error && (
+                {item.translated && typeof item.translated === 'object' && item.translated.error && (
                   <div className="text-red-600 text-xs">{item.translated.error}</div>
+                )}
+                {item.translated && typeof item.translated === 'string' && (
+                  <div className="flex items-center gap-2 text-blue-800 font-semibold">
+                    <span className="text-lg">🌍</span>
+                    <span>{item.translated}</span>
+                  </div>
                 )}
               </div>
             ))}
