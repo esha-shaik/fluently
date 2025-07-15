@@ -20,7 +20,7 @@ function HomePage({
   languageFlags,
 }) {
   return (
-    <div className="flex-1 p-2 sm:p-4 flex flex-col min-h-0 space-y-0 pb-28 bg-gradient-to-br from-purple-100 via-blue-50 to-blue-200">
+    <div className="flex-1 p-2 sm:p-4 flex flex-col min-h-0 space-y-0 pb-28 bg-gradient-to-br from-purple-100 via-blue-50 to-blue-200 min-h-screen">
       {/* Main content split: translation area (top, fixed height) + history (bottom, fills remaining space) */}
       <div className="flex flex-col flex-shrink-0">
         {/* Translation Box */}
@@ -31,7 +31,7 @@ function HomePage({
               <select
                 value={fromLanguage}
                 onChange={(e) => setFromLanguage(e.target.value)}
-                className="bg-purple-50 text-purple-700 px-2 sm:px-3 pl-6 sm:pl-8 py-1.5 sm:py-2 rounded-xl border border-purple-200 outline-none font-medium shadow-sm focus:ring-2 focus:ring-purple-300 appearance-none w-full transition-all duration-200"
+                className="bg-purple-50 text-purple-700 px-2 sm:px-3 pl-2 sm:pl-8 py-1.5 sm:py-2 rounded-xl border border-purple-200 outline-none font-medium shadow-sm focus:ring-2 focus:ring-purple-300 appearance-none w-full transition-all duration-200 text-center sm:text-left"
               >
                 <option key="auto" value="auto">
                   {window.innerWidth >= 640 ? "Auto Detect" : "Auto"}
@@ -43,7 +43,7 @@ function HomePage({
                 ))}
               </select>
               {/* Custom dropdown arrow */}
-              <span className="pointer-events-none absolute left-1 sm:left-2 top-1/2 transform -translate-y-1/2 text-lg sm:text-xl">{languageFlags[fromLanguage] || "🌐"}</span>
+              <span className="pointer-events-none absolute left-1 sm:left-2 top-1/2 transform -translate-y-1/2 text-lg sm:text-xl flex items-center justify-center hidden sm:flex">{languageFlags[fromLanguage] || "🌐"}</span>
               <span className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg hidden sm:inline">▼</span>
             </div>
 
@@ -59,7 +59,7 @@ function HomePage({
               <select
                 value={toLanguage}
                 onChange={(e) => setToLanguage(e.target.value)}
-                className="bg-blue-50 text-blue-700 px-2 sm:px-3 pl-6 sm:pl-8 py-1.5 sm:py-2 rounded-xl border border-blue-200 outline-none font-medium shadow-sm focus:ring-2 focus:ring-blue-300 appearance-none w-full transition-all duration-200"
+                className="bg-blue-50 text-blue-700 px-2 sm:px-3 pl-2 sm:pl-8 py-1.5 sm:py-2 rounded-xl border border-blue-200 outline-none font-medium shadow-sm focus:ring-2 focus:ring-blue-300 appearance-none w-full transition-all duration-200 text-center sm:text-left"
               >
                 {languages.map((lang) => (
                   <option key={lang} value={lang}>
@@ -68,7 +68,7 @@ function HomePage({
                 ))}
               </select>
               {/* Custom dropdown arrow */}
-              <span className="pointer-events-none absolute left-1 sm:left-2 top-1/2 transform -translate-y-1/2 text-lg sm:text-xl">{languageFlags[toLanguage] || "🌐"}</span>
+              <span className="pointer-events-none absolute left-1 sm:left-2 top-1/2 transform -translate-y-1/2 text-lg sm:text-xl flex items-center justify-center hidden sm:flex">{languageFlags[toLanguage] || "🌐"}</span>
               <span className="pointer-events-none absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg hidden sm:inline">▼</span>
             </div>
           </div>
