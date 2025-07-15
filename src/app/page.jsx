@@ -4,6 +4,7 @@ import { translateText, translateMessage } from "../utilities/api";
 import HomePage from "./HomePage";
 import ChatPage from "./ChatPage";
 import CollectionsPage from "./CollectionsPage";
+import TranslationsPage from "./TranslationsPage";
 
 function MainComponent() {
   const [showSplash, setShowSplash] = React.useState(true);
@@ -426,7 +427,7 @@ function MainComponent() {
     const newTranslation = {
       id: Date.now(),
       original: inputText,
-      translated: result,
+      translated: typeof result === 'object' ? result.translation || result.error : result,
       from: fromLanguage,
       to: toLanguage,
       timestamp: new Date().toLocaleDateString(),
@@ -449,6 +450,10 @@ function MainComponent() {
     setTranslatedText(inputText);
   };
 
+  const clearTranslationHistory = () => {
+    setTranslationHistory([]);
+  };
+
   if (showSplash) {
     return (
       <div
@@ -469,14 +474,23 @@ function MainComponent() {
   return (
     <div className="flex flex-col font-poppins">
       {/* Header */}
-      <div className="bg-white shadow-sm p-4">
-        <h1 className="text-2xl font-bold text-center bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-          Fluently
-        </h1>
+      <div className="bg-white/95 shadow-sm border-b border-gray-200 backdrop-blur-xl">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+                <span className="text-white text-lg">🌐</span>
+              </div>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Fluently
+              </h1>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-purple-100 to-blue-100">
+      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-purple-100 to-blue-100 pb-20">
         {currentPage === "home" && (
           <HomePage
             fromLanguage={fromLanguage}
@@ -527,6 +541,13 @@ function MainComponent() {
             setNewCollectionName={setNewCollectionName}
             newCollectionDescription={newCollectionDescription}
             setNewCollectionDescription={setNewCollectionDescription}
+          />
+        )}
+        {currentPage === "translations" && (
+          <TranslationsPage
+            translationHistory={translationHistory}
+            languageFlags={languageFlags}
+            clearHistory={clearTranslationHistory}
           />
         )}
       </div>
@@ -628,49 +649,79 @@ function MainComponent() {
       )}
 
       {/* Bottom Navigation */}
-      <div className="bg-white/90 border-t border-blue-200 shadow-lg px-4 py-2 fixed bottom-0 left-0 w-full z-50 backdrop-blur-md">
-        <div className="flex justify-around">
-          <button
-            onClick={() => setCurrentPage("home")}
-            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
-              currentPage === "home"
-                ? "bg-purple-100 text-purple-600"
-                : "text-gray-500 hover:text-purple-600"
-            }`}
-          >
-            <span className="text-xl mb-1">🏠</span>
-            <span className="text-xs font-medium">Home</span>
-          </button>
+      <div className="px-3 sm:px-6 py-3 sm:py-4 fixed bottom-0 left-0 w-full z-50">
+        <div className="flex justify-center items-center max-w-md mx-auto">
+          <div className="flex items-center justify-between w-full bg-white/95 backdrop-blur-xl rounded-2xl p-2 sm:p-2 shadow-2xl border border-gray-200/50">
+            <button
+              onClick={() => setCurrentPage("home")}
+              className={`flex flex-col items-center py-3 px-3 sm:py-3 sm:px-4 rounded-xl transition-all duration-300 relative group ${
+                currentPage === "home"
+                  ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg transform scale-105"
+                  : "text-gray-500 hover:text-purple-600 hover:bg-purple-50"
+              }`}
+            >
+              <svg className={`w-6 h-6 sm:w-5 sm:h-5 mb-1 sm:mb-1 transition-all duration-300 ${currentPage === "home" ? 'scale-110' : 'group-hover:scale-110'}`} fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+              </svg>
+              <span className={`text-xs font-medium transition-all duration-300 hidden md:block ${currentPage === "home" ? 'text-white' : 'text-gray-600 group-hover:text-purple-700'}`}>
+                Home
+              </span>
+            </button>
 
-          <button
-            onClick={() => {
-              setCurrentPage("chat");
-              setSelectedChat(null);
-            }}
-            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
-              currentPage === "chat"
-                ? "bg-blue-100 text-blue-600"
-                : "text-gray-500 hover:text-blue-600"
-            }`}
-          >
-            <span className="text-xl mb-1">💬</span>
-            <span className="text-xs font-medium">Chat</span>
-          </button>
+            <button
+              onClick={() => {
+                setCurrentPage("chat");
+                setSelectedChat(null);
+              }}
+              className={`flex flex-col items-center py-3 px-3 sm:py-3 sm:px-4 rounded-xl transition-all duration-300 relative group ${
+                currentPage === "chat"
+                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg transform scale-105"
+                  : "text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+              }`}
+            >
+              <svg className={`w-6 h-6 sm:w-5 sm:h-5 mb-1 sm:mb-1 transition-all duration-300 ${currentPage === "chat" ? 'scale-110' : 'group-hover:scale-110'}`} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd"/>
+              </svg>
+              <span className={`text-xs font-medium transition-all duration-300 hidden md:block ${currentPage === "chat" ? 'text-white' : 'text-gray-600 group-hover:text-blue-700'}`}>
+                Chat
+              </span>
+            </button>
 
-          <button
-            onClick={() => {
-              setCurrentPage("collections");
-              setSelectedCollection(null);
-            }}
-            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
-              currentPage === "collections"
-                ? "bg-purple-100 text-purple-600"
-                : "text-gray-500 hover:text-purple-600"
-            }`}
-          >
-            <span className="text-xl mb-1">📚</span>
-            <span className="text-xs font-medium">Collections</span>
-          </button>
+            <button
+              onClick={() => setCurrentPage("translations")}
+              className={`flex flex-col items-center py-3 px-3 sm:py-3 sm:px-4 rounded-xl transition-all duration-300 relative group ${
+                currentPage === "translations"
+                  ? "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg transform scale-105"
+                  : "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
+              }`}
+            >
+              <svg className={`w-6 h-6 sm:w-5 sm:h-5 mb-1 sm:mb-1 transition-all duration-300 ${currentPage === "translations" ? 'scale-110' : 'group-hover:scale-110'}`} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+              </svg>
+              <span className={`text-xs font-medium transition-all duration-300 hidden md:block ${currentPage === "translations" ? 'text-white' : 'text-gray-600 group-hover:text-indigo-700'}`}>
+                History
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setCurrentPage("collections");
+                setSelectedCollection(null);
+              }}
+              className={`flex flex-col items-center py-3 px-3 sm:py-3 sm:px-4 rounded-xl transition-all duration-300 relative group ${
+                currentPage === "collections"
+                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transform scale-105"
+                  : "text-gray-500 hover:text-emerald-600 hover:bg-emerald-50"
+              }`}
+            >
+              <svg className={`w-6 h-6 sm:w-5 sm:h-5 mb-1 sm:mb-1 transition-all duration-300 ${currentPage === "collections" ? 'scale-110' : 'group-hover:scale-110'}`} fill="currentColor" viewBox="0 0 20 20">
+                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+              </svg>
+              <span className={`text-xs font-medium transition-all duration-300 hidden md:block ${currentPage === "collections" ? 'text-white' : 'text-gray-600 group-hover:text-emerald-700'}`}>
+                Collections
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

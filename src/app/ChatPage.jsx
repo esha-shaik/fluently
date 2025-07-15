@@ -371,7 +371,7 @@ function ChatPage({
         </div>
 
         {/* Messages - scrollable, fills available space, with bottom padding for input/nav */}
-        <div className="flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full pb-40" style={{scrollBehavior:'smooth'}}>
+        <div className="flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full pb-48" style={{scrollBehavior:'smooth'}}>
           {/* Show filler content when no messages */}
           {chatMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full space-y-6 py-12 mt-18 md:mt-20">
@@ -410,7 +410,7 @@ function ChatPage({
         </div>
 
         {/* Message Input Bar - fixed at bottom, always visible above nav */}
-        <div className="fixed bottom-16 left-0 w-full flex justify-center z-40 pointer-events-none mb-3">
+        <div className="fixed bottom-16 left-0 w-full flex justify-center z-40 pointer-events-none mb-4 sm:mb-10">
           <div className="w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl flex-shrink-0 px-1 md:px-8 pb-2 pointer-events-auto">
             <div className="flex items-end space-x-3 bg-white border border-blue-100 rounded-2xl shadow-lg p-2">
               {/* Emoji Button */}
@@ -526,6 +526,7 @@ function ChatPage({
 
   // Memoize the messages rendering to prevent unnecessary re-renders
   const renderedMessages = useMemo(() => {
+    if (!selectedChat) return null; // Guard: don't render messages if no chat is selected
     return chatMessages.map((message, idx) => {
       const isMe = message.sender === "me";
       const isSender = !isMe;
