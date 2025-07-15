@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { sendChatMessage, translateText } from "../utilities/api";
 
 // New helper to get both reply and translation in one Gemini call
@@ -80,38 +80,29 @@ function ChatPage({
     }
   }, [selectedChat]);
 
-  // Automatically translate new incoming messages from 'them' if not English
-  React.useEffect(() => {
-    chatMessages.forEach((msg) => {
-      if (
-        msg.sender === "them" &&
-        (!msg.translationDetails || !msg.translationDetails.auto)
-      ) {
-        // Only auto-translate if not already translated and not English
-        // We'll use Gemini to detect language, but for now, always auto-translate to English
-        handleTranslateMessage(msg.id, msg.text, msg.originalLanguage || chatLanguage, true);
-      }
-    });
-    // eslint-disable-next-line
-  }, [chatMessages]);
+  // Remove the problematic auto-translate useEffect that was causing infinite loops
+  // The translation will be handled when messages are actually received
 
   // Ensure every 'them' message has an English translation ready (but only if not already present)
   useEffect(() => {
-    chatMessages.forEach((msg) => {
-      if (
-        msg.sender === 'them' &&
-        !msg.translation &&
-        (!msg.translationDetails || !msg.translationDetails.English || !msg.translationDetails.English.translation)
-      ) {
+    const messagesNeedingTranslation = chatMessages.filter(msg => 
+      msg.sender === 'them' &&
+      !msg.translation &&
+      (!msg.translationDetails || !msg.translationDetails.English || !msg.translationDetails.English.translation)
+    );
+
+    if (messagesNeedingTranslation.length > 0) {
+      messagesNeedingTranslation.forEach(msg => {
         translateText({ inputText: msg.text, fromLanguage: 'auto', toLanguage: 'English' }).then(result => {
           setChatMessages(prev => prev.map(m =>
             m.id === msg.id ? { ...m, translation: result.translation || '', translationDetails: { ...m.translationDetails, English: { translation: result.translation || '' } } } : m
           ));
+        }).catch(err => {
+          console.error('Translation error:', err);
         });
-      }
-    });
-    // eslint-disable-next-line
-  }, [chatMessages]);
+      });
+    }
+  }, [chatMessages.length]); // Only run when message count changes, not on every message change
 
   // Modified handleTranslateMessage to support auto flag
   const handleAutoTranslateMessage = async (messageId, messageText, fromLang, auto = false) => {
@@ -156,7 +147,7 @@ function ChatPage({
   }, [showLangPicker]);
 
   // Update handleSendMessage to also update the selected conversation in allConversations
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
     if (!newMessage.trim() || sending) return;
     setShowEmojiPicker(false);
     const userMsg = {
@@ -178,28 +169,43 @@ function ChatPage({
     setTimeout(() => setTyping(true), delay);
     // Wait for the delay, then fetch the bot reply
     setTimeout(async () => {
-      // Get both reply and translation in one call
-      const geminiDetails = await getReplyAndTranslation({ message: userMsg.text, chatLanguage, userName: selectedChat.name });
-      console.log('Gemini details used in chat:', geminiDetails); // <-- LOG DETAILS USED
-      const { reply, ...details } = geminiDetails;
-      const botMsg = {
-        id: Date.now() + 1,
-        text: reply,
-        sender: "them",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        translation: details.translation || '',
-        translationDetails: details, // <-- Store all details here
-      };
-      setChatMessages((prev) => [...prev, botMsg]);
-      setAllConversations(prev => prev.map(conv =>
-        conv.id === selectedChat.id
-          ? { ...conv, messages: [...conv.messages, botMsg], lastMessage: botMsg.text, time: botMsg.timestamp }
-          : conv
-      ));
-      setTyping(false); // Only turn off typing when the message is ready
-      setSending(false);
+      try {
+        // Get both reply and translation in one call
+        const geminiDetails = await getReplyAndTranslation({ message: userMsg.text, chatLanguage, userName: selectedChat.name });
+        console.log('Gemini details used in chat:', geminiDetails); // <-- LOG DETAILS USED
+        const { reply, ...details } = geminiDetails;
+        const botMsg = {
+          id: Date.now() + 1,
+          text: reply,
+          sender: "them",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          translation: details.translation || '',
+          translationDetails: details, // <-- Store all details here
+        };
+        setChatMessages((prev) => [...prev, botMsg]);
+        setAllConversations(prev => prev.map(conv =>
+          conv.id === selectedChat.id
+            ? { ...conv, messages: [...conv.messages, botMsg], lastMessage: botMsg.text, time: botMsg.timestamp }
+            : conv
+        ));
+      } catch (error) {
+        console.error('Error getting bot reply:', error);
+        // Add error message to chat
+        const errorMsg = {
+          id: Date.now() + 1,
+          text: "Sorry, I'm having trouble responding right now. Please try again.",
+          sender: "them",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          translation: "Sorry, I'm having trouble responding right now. Please try again.",
+          translationDetails: { translation: "Sorry, I'm having trouble responding right now. Please try again." },
+        };
+        setChatMessages((prev) => [...prev, errorMsg]);
+      } finally {
+        setTyping(false); // Only turn off typing when the message is ready
+        setSending(false);
+      }
     }, delay);
-  };
+  }, [newMessage, sending, selectedChat, chatLanguage]);
 
   const handleEmojiClick = (emoji) => {
     // Insert emoji at cursor position
@@ -386,179 +392,8 @@ function ChatPage({
               </div>
             </div>
           ) : (
-            // Existing message rendering logic
-            chatMessages.map((message, idx) => {
-              const isMe = message.sender === "me";
-              const isSender = !isMe;
-              // Ensure translation is available for new bot replies
-              if (
-                isSender &&
-                message.translation &&
-                (!message.translationDetails || !message.translationDetails.English)
-              ) {
-                setChatMessages(prev => prev.map(m =>
-                  m.id === message.id ? { ...m, translationDetails: { ...m.translationDetails, English: { translation: message.translation } } } : m
-                ));
-              }
-              // Remove per-message translation language dropdown and related state/logic
-              // At the top, remove messageLangs state
-              // Remove translateToLanguage and showLangPicker from the top-level state
-              // Remove showOriginal state and button logic for toggling translation
-              // In the message rendering loop, determine if translation is shown for this message
-              const isTranslationShown = !!showTranslation[message.id];
-              const translationObj = message.translationDetails || {};
-              const isFetching = !!fetchingTranslation[message.id];
-              const shouldShowTranslation = isSender && !!translationObj && !!translationObj.translation;
-              // In the message rendering loop, extract details from translationObj
-              const details = translationObj || {};
-              // Remove showTranslationNow state and button logic for toggling translation
-              return (
-                <div
-                  key={message.id}
-                  className={`flex flex-col items-end ${isMe ? "justify-end" : "justify-start"} w-full animate-fade-in`}
-                >
-                  <div className={`flex items-start ${isMe ? "justify-end" : "justify-start"} w-full`}>
-                    {!isMe && (
-                      <img
-                        src={`https://api.dicebear.com/7.x/personas/svg?seed=${selectedChat.name}`}
-                        alt="avatar"
-                        className="w-9 h-9 rounded-full mr-2 border border-gray-200 shadow-sm"
-                      />
-                    )}
-                    <div className={`flex flex-col max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
-                      <div
-                        className={`relative px-4 py-2 rounded-2xl shadow transition-all duration-200 text-base break-words ${
-                          isMe
-                            ? "bg-blue-500 text-white rounded-br-md"
-                            : "bg-white text-gray-900 border border-blue-100 rounded-bl-md"
-                        }`}
-                        title={message.timestamp}
-                      >
-                        {/* Show original by default, translation only if toggled */}
-                        {isSender && shouldShowTranslation && isTranslationShown
-                          ? translationObj.translation
-                          : message.text}
-                        {/* Bubble tail */}
-                        <span
-                          className={`absolute bottom-0 ${isMe ? "right-0" : "left-0"} w-3 h-3 ${isMe ? "bg-blue-500" : "bg-white border-blue-100 border-b border-l"} rounded-bl-2xl rounded-br-2xl transform translate-y-1/2 ${isMe ? "-mr-1" : "-ml-1"}`}
-                          style={{ zIndex: 0 }}
-                        ></span>
-                      </div>
-                      {/* Message actions - for both user and bot messages */}
-                      <div className="flex gap-1.5 mt-2 px-1 justify-end">
-                        {isSender && (
-                          <>
-                            <button
-                              className="text-xs bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:shadow-sm transition-all duration-200 flex items-center gap-1.5 disabled:opacity-60 font-medium"
-                              disabled={isFetching}
-                              onClick={async () => {
-                                if (!translationObj) {
-                                  setFetchingTranslation(prev => ({ ...prev, [message.id]: true }));
-                                  const result = await translateText({
-                                    inputText: message.text,
-                                    fromLanguage: 'auto',
-                                    toLanguage: 'English',
-                                  });
-                                  setChatMessages(prev => prev.map(m =>
-                                    m.id === message.id ? { ...m, translation: result.translation || '', translationDetails: { ...m.translationDetails, English: { translation: result.translation || '' } } } : m
-                                  ));
-                                  setShowTranslation(prev => ({ ...prev, [message.id]: true }));
-                                  setFetchingTranslation(prev => ({ ...prev, [message.id]: false }));
-                                } else {
-                                  setShowTranslation(prev => ({ ...prev, [message.id]: !prev[message.id] }));
-                                }
-                              }}
-                            >
-                              {isFetching ? (
-                                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                              ) : (
-                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
-                              )}
-                              {isTranslationShown ? "Original" : "Translate"}
-                            </button>
-                            {translationObj && Object.keys(translationObj).length > 0 && (
-                              <button
-                                className="text-xs bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
-                                onClick={() => setShowDetailsForMessageId(showDetailsForMessageId === message.id ? null : message.id)}
-                              >
-                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                {showDetailsForMessageId === message.id ? 'Hide' : 'Details'}
-                              </button>
-                            )}
-                            <button
-                              className="text-xs bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
-                              onClick={() => {
-                                setMessageToSave({
-                                  text: message.text,
-                                  translation: message.translation,
-                                  originalLanguage: message.originalLanguage || chatLanguage,
-                                  translationDetails: message.translationDetails,
-                                  sender: message.sender
-                                });
-                                setShowSaveModal(true);
-                              }}
-                            >
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-                              Save
-                            </button>
-                          </>
-                        )}
-                        {!isSender && translationObj && Object.keys(translationObj).length > 0 && (
-                          <button
-                            className="text-xs bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
-                            onClick={() => setShowDetailsForMessageId(showDetailsForMessageId === message.id ? null : message.id)}
-                          >
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            {showDetailsForMessageId === message.id ? 'Hide' : 'Details'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {/* Timestamp positioned outside on the right, aligned with message bubble */}
-                    <div className={`ml-2 text-[10px] text-gray-500 opacity-70 ${isMe ? 'order-first mr-2' : ''}`} style={{ marginTop: '14px' }}>
-                      {message.timestamp}
-                    </div>
-                    {isMe && (
-                      <img
-                        src="https://api.dicebear.com/7.x/personas/svg?seed=me"
-                        alt="me"
-                        className="w-9 h-9 rounded-full ml-2 border border-gray-200 shadow-sm"
-                      />
-                    )}
-                  </div>
-                  {/* Translation details panel - improved UI */}
-                  {translationObj && Object.keys(translationObj).length > 0 && showDetailsForMessageId === message.id && (
-                    <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-50 border border-blue-200 rounded-2xl shadow-lg max-w-md relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-500"></div>
-                      <div className="space-y-3">
-                        {translationObj.tone_of_speech && (
-                          <div className="flex items-center space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-blue-600 text-sm">🎭</span>
-                            </div>
-                            <div>
-                              <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Tone</div>
-                              <div className="text-sm text-gray-800 font-medium">{translationObj.tone_of_speech}</div>
-                            </div>
-                          </div>
-                        )}
-                        {translationObj.cultural_notes && (
-                          <div className="flex items-center space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                              <span className="text-purple-600 text-sm">🌍</span>
-                            </div>
-                            <div>
-                              <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Cultural Context</div>
-                              <div className="text-sm text-gray-800">{translationObj.cultural_notes}</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
+            // Use memoized messages instead of inline mapping
+            renderedMessages
           )}
           <div ref={messagesEndRef} />
           {/* Typing indicator for bot reply */}
@@ -666,14 +501,190 @@ function ChatPage({
   useEffect(() => {
     const saved = localStorage.getItem('fluently_conversations');
     if (saved) {
-      setAllConversations(JSON.parse(saved));
+      try {
+        setAllConversations(JSON.parse(saved));
+      } catch (error) {
+        console.error('Error loading conversations from localStorage:', error);
+        setAllConversations([]);
+      }
     }
     // eslint-disable-next-line
   }, []);
-  // Save allConversations to localStorage whenever it changes
+
+  // Save allConversations to localStorage with debouncing to prevent excessive writes
   useEffect(() => {
-    localStorage.setItem('fluently_conversations', JSON.stringify(allConversations));
+    const timeoutId = setTimeout(() => {
+      try {
+        localStorage.setItem('fluently_conversations', JSON.stringify(allConversations));
+      } catch (error) {
+        console.error('Error saving conversations to localStorage:', error);
+      }
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
   }, [allConversations]);
+
+  // Memoize the messages rendering to prevent unnecessary re-renders
+  const renderedMessages = useMemo(() => {
+    return chatMessages.map((message, idx) => {
+      const isMe = message.sender === "me";
+      const isSender = !isMe;
+      const isTranslationShown = !!showTranslation[message.id];
+      const translationObj = message.translationDetails || {};
+      const isFetching = !!fetchingTranslation[message.id];
+      const shouldShowTranslation = isSender && !!translationObj && !!translationObj.translation;
+      const details = translationObj || {};
+      
+      return (
+        <div
+          key={message.id}
+          className={`flex flex-col items-end ${isMe ? "justify-end" : "justify-start"} w-full animate-fade-in`}
+        >
+          <div className={`flex items-start ${isMe ? "justify-end" : "justify-start"} w-full`}>
+            {!isMe && (
+              <img
+                src={`https://api.dicebear.com/7.x/personas/svg?seed=${selectedChat.name}`}
+                alt="avatar"
+                className="w-9 h-9 rounded-full mr-2 border border-gray-200 shadow-sm"
+                loading="lazy"
+              />
+            )}
+            <div className={`flex flex-col max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
+              <div
+                className={`relative px-4 py-2 rounded-2xl shadow transition-all duration-200 text-base break-words ${
+                  isMe
+                    ? "bg-blue-500 text-white rounded-br-md"
+                    : "bg-white text-gray-900 border border-blue-100 rounded-bl-md"
+                }`}
+                title={message.timestamp}
+              >
+                {/* Show original by default, translation only if toggled */}
+                {isSender && shouldShowTranslation && isTranslationShown
+                  ? translationObj.translation
+                  : message.text}
+                {/* Bubble tail */}
+                <span
+                  className={`absolute bottom-0 ${isMe ? "right-0" : "left-0"} w-3 h-3 ${isMe ? "bg-blue-500" : "bg-white border-blue-100 border-b border-l"} rounded-bl-2xl rounded-br-2xl transform translate-y-1/2 ${isMe ? "-mr-1" : "-ml-1"}`}
+                  style={{ zIndex: 0 }}
+                ></span>
+              </div>
+              {/* Message actions - for both user and bot messages */}
+              <div className="flex gap-1.5 mt-2 px-1 justify-end">
+                {isSender && (
+                  <>
+                    <button
+                      className="text-xs bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:shadow-sm transition-all duration-200 flex items-center gap-1.5 disabled:opacity-60 font-medium"
+                      disabled={isFetching}
+                      onClick={async () => {
+                        if (!translationObj) {
+                          setFetchingTranslation(prev => ({ ...prev, [message.id]: true }));
+                          const result = await translateText({
+                            inputText: message.text,
+                            fromLanguage: 'auto',
+                            toLanguage: 'English',
+                          });
+                          setChatMessages(prev => prev.map(m =>
+                            m.id === message.id ? { ...m, translation: result.translation || '', translationDetails: { ...m.translationDetails, English: { translation: result.translation || '' } } } : m
+                          ));
+                          setShowTranslation(prev => ({ ...prev, [message.id]: true }));
+                          setFetchingTranslation(prev => ({ ...prev, [message.id]: false }));
+                        } else {
+                          setShowTranslation(prev => ({ ...prev, [message.id]: !prev[message.id] }));
+                        }
+                      }}
+                    >
+                      {isFetching ? (
+                        <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                      ) : (
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
+                      )}
+                      {isTranslationShown ? "Original" : "Translate"}
+                    </button>
+                    {translationObj && Object.keys(translationObj).length > 0 && (
+                      <button
+                        className="text-xs bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
+                        onClick={() => setShowDetailsForMessageId(showDetailsForMessageId === message.id ? null : message.id)}
+                      >
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        {showDetailsForMessageId === message.id ? 'Hide' : 'Details'}
+                      </button>
+                    )}
+                    <button
+                      className="text-xs bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
+                      onClick={() => {
+                        setMessageToSave({
+                          text: message.text,
+                          translation: message.translation,
+                          originalLanguage: message.originalLanguage || chatLanguage,
+                          translationDetails: message.translationDetails,
+                          sender: message.sender
+                        });
+                        setShowSaveModal(true);
+                      }}
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                      Save
+                    </button>
+                  </>
+                )}
+                {!isSender && translationObj && Object.keys(translationObj).length > 0 && (
+                  <button
+                    className="text-xs bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 hover:shadow-sm transition-all duration-200 font-medium flex items-center gap-1.5"
+                    onClick={() => setShowDetailsForMessageId(showDetailsForMessageId === message.id ? null : message.id)}
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {showDetailsForMessageId === message.id ? 'Hide' : 'Details'}
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* Timestamp positioned outside on the right, aligned with message bubble */}
+            <div className={`ml-2 text-[10px] text-gray-500 opacity-70 ${isMe ? 'order-first mr-2' : ''}`} style={{ marginTop: '14px' }}>
+              {message.timestamp}
+            </div>
+            {isMe && (
+              <img
+                src="https://api.dicebear.com/7.x/personas/svg?seed=me"
+                alt="me"
+                className="w-9 h-9 rounded-full ml-2 border border-gray-200 shadow-sm"
+                loading="lazy"
+              />
+            )}
+          </div>
+          {/* Translation details panel - improved UI */}
+          {translationObj && Object.keys(translationObj).length > 0 && showDetailsForMessageId === message.id && (
+            <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-50 border border-blue-200 rounded-2xl shadow-lg max-w-md relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-500"></div>
+              <div className="space-y-3">
+                {translationObj.tone_of_speech && (
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 text-sm">🎭</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Tone</div>
+                      <div className="text-sm text-gray-800 font-medium">{translationObj.tone_of_speech}</div>
+                    </div>
+                  </div>
+                )}
+                {translationObj.cultural_notes && (
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                      <span className="text-purple-600 text-sm">🌍</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Cultural Context</div>
+                      <div className="text-sm text-gray-800">{translationObj.cultural_notes}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    });
+  }, [chatMessages, showTranslation, fetchingTranslation, showDetailsForMessageId, selectedChat, chatLanguage, setMessageToSave, setShowSaveModal]);
 
   return renderChatView();
 }
