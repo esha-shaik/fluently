@@ -51,11 +51,25 @@ input, textarea, select {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
 }
 .animate-fade-in {
-  animation: fade-in 0.5s ease;
+  animation: fade-in 0.5s cubic-bezier(0.4,0,0.2,1) both;
+}
+@keyframes fade-in-slow {
+  from { opacity: 0; transform: translateY(32px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fade-in-slow {
+  animation: fade-in-slow 1.2s cubic-bezier(0.4,0,0.2,1) both;
+}
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 2.2s infinite cubic-bezier(0.68,-0.55,0.27,1.55);
 }
 
 /* Hide scrollbars for card containers and lists */
