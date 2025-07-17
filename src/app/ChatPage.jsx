@@ -243,11 +243,11 @@ function ChatPage({
   // Update renderChatList to use allConversations and add a 'New Conversation' button
   const renderChatList = () => (
     <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-purple-50 to-blue-100">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-screen-xl px-8 mx-auto my-8">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Chats</h2>
+      <div className="bg-white rounded-2xl shadow-lg p-3 sm:p-8 w-full max-w-screen-xl px-2 sm:px-8 mx-auto my-3 sm:my-8">
+        <div className="flex items-center justify-between mb-4 sm:mb-8">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-800">Chats</h2>
           <button
-            className="group relative flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 rounded-2xl shadow-lg transition-all duration-300 text-base font-semibold hover:from-indigo-700 hover:to-purple-700 hover:shadow-2xl hover:scale-105"
+            className="group relative flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3 py-2 sm:px-5 sm:py-2.5 rounded-2xl shadow-lg transition-all duration-300 text-sm sm:text-base font-semibold hover:from-indigo-700 hover:to-purple-700 hover:shadow-2xl hover:scale-105"
             onClick={() => {
               const name = prompt('Enter a name for the new conversation:');
               if (name && name.trim()) {
@@ -265,15 +265,15 @@ function ChatPage({
               }
             }}
           >
-            <span className="text-xl group-hover:rotate-90 transition-transform duration-300">＋</span> <span className="hidden xs:inline sm:inline">New Conversation</span><span className="inline xs:hidden sm:hidden">New</span>
+            <span className="text-lg sm:text-xl group-hover:rotate-90 transition-transform duration-300">＋</span> <span className="inline sm:hidden">New</span><span className="hidden sm:inline">New Conversation</span>
           </button>
         </div>
-        <div className="space-y-6">
-          {allConversations.map((chat) => (
+        <div className="divide-y divide-blue-100">
+          {allConversations.map((chat, idx) => (
             <div
               key={chat.id}
-              className="flex items-center p-4 sm:p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl cursor-pointer hover:shadow-xl hover:bg-blue-100 transition-all border border-blue-100 gap-4 sm:gap-6 group relative"
-              style={{ minHeight: 80 }}
+              className="flex items-center p-2 sm:p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl cursor-pointer hover:shadow-xl hover:bg-blue-100 transition-all border border-blue-100 gap-2 sm:gap-6 group relative my-2 sm:my-4"
+              style={{ minHeight: 56, minHeight: 'auto', ...(window.innerWidth >= 640 ? { minHeight: 80 } : {}) }}
               onClick={e => {
                 if (e.target.closest('.delete-chat-btn')) return;
                 setSelectedChat(chat);
@@ -282,12 +282,12 @@ function ChatPage({
               <img
                 src={`https://api.dicebear.com/7.x/personas/svg?seed=${chat.name}`}
                 alt="avatar"
-                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-blue-200 shadow group-hover:border-blue-400 transition-all flex-shrink-0"
+                className="w-10 h-10 sm:w-20 sm:h-20 rounded-full border-2 border-blue-200 shadow group-hover:border-blue-400 transition-all flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-1">
-                  <h3 className="font-semibold text-sm sm:text-lg text-gray-800 truncate max-w-[100px] sm:max-w-none">{chat.name}</h3>
-                  <div className="flex items-center gap-2 sm:gap-4">
+                  <h3 className="font-semibold text-base sm:text-lg text-gray-800 truncate max-w-[160px] sm:max-w-none">{chat.name}</h3>
+                  <div className="flex items-center gap-1 sm:gap-4">
                     <span className="text-xs sm:text-sm text-gray-400 whitespace-nowrap">{chat.time}</span>
                     <button
                       className="delete-chat-btn text-gray-400 hover:text-red-500 p-2 rounded-full transition-colors ml-1"
@@ -319,7 +319,7 @@ function ChatPage({
     return (
       <div className="flex flex-col min-h-screen bg-gradient-to-br from-purple-50 to-blue-100">
         {/* Improved Sticky Chat Header */}
-        <div className="sticky top-0 z-20 bg-white/95 shadow-md px-4 py-3 flex items-center border-b border-blue-100 max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto rounded-b-2xl backdrop-blur-md">
+        <div className="sticky top-0 z-20 bg-white/95 shadow-md px-4 py-3 flex items-center border-b border-blue-100 w-full md:max-w-4xl lg:max-w-5xl xl:max-w-6xl md:mx-auto rounded-b-2xl backdrop-blur-md">
           <button
             onClick={() => setSelectedChat(null)}
             className="mr-3 text-purple-600 hover:bg-purple-50 p-2 rounded-lg transition-colors"
@@ -371,10 +371,10 @@ function ChatPage({
         </div>
 
         {/* Messages - scrollable, fills available space, with bottom padding for input/nav */}
-        <div className="flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full pb-48" style={{scrollBehavior:'smooth'}}>
+        <div className={`flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full ${chatMessages.length > 0 ? 'pb-20' : ''}`} style={{scrollBehavior:'smooth'}}>
           {/* Show filler content when no messages */}
           {chatMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full space-y-6 py-12 mt-18 md:mt-20">
+            <div className="flex flex-1 flex-col items-center justify-center min-h-[60vh] space-y-6 py-12 mt-18 md:mt-20">
               {/* Simple welcome message */}
               <div className="text-center space-y-3">
                 <h3 className="text-lg font-semibold text-gray-800">Start a conversation with {selectedChat.name}</h3>
@@ -410,8 +410,8 @@ function ChatPage({
         </div>
 
         {/* Message Input Bar - fixed at bottom, always visible above nav */}
-        <div className="fixed bottom-16 left-0 w-full flex justify-center z-40 pointer-events-none mb-4 sm:mb-10">
-          <div className="w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl flex-shrink-0 px-1 md:px-8 pb-2 pointer-events-auto">
+        <div className="fixed bottom-16 left-0 w-full flex justify-center z-40 pointer-events-none mb-4 sm:mb-10 px-3 sm:px-6">
+          <div className="w-full max-w-md md:max-w-4xl lg:max-w-5xl xl:max-w-6xl flex-shrink-0 px-1 md:px-8 pb-2 pointer-events-auto mx-auto">
             <div className="flex items-end space-x-3 bg-white border border-blue-100 rounded-2xl shadow-lg p-2">
               {/* Emoji Button */}
               <div className="relative flex items-center justify-center min-h-[44px]">

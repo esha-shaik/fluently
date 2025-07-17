@@ -649,7 +649,7 @@ function MainComponent() {
       )}
 
       {/* Bottom Navigation */}
-      <div className="px-3 sm:px-6 py-3 sm:py-4 fixed bottom-0 left-0 w-full z-50">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 fixed bottom-0 left-0 w-full z-50">
         <div className="flex justify-center items-center max-w-md mx-auto">
           <div className="flex items-center justify-between w-full bg-white/95 backdrop-blur-xl rounded-2xl p-2 sm:p-2 shadow-2xl border border-gray-200/50">
             <button
