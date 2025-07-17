@@ -73,6 +73,7 @@ function ChatPage({
   const [allConversations, setAllConversations] = useState(conversations || []);
   // At the top, add state for showing translation details for a message
   const [showDetailsForMessageId, setShowDetailsForMessageId] = useState(null);
+  const chatListRef = useRef(null);
 
   React.useEffect(() => {
     if (selectedChat) {
@@ -242,7 +243,7 @@ function ChatPage({
 
   // Update renderChatList to use allConversations and add a 'New Conversation' button
   const renderChatList = () => (
-    <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-purple-50 to-blue-100">
+    <div ref={chatListRef} className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-purple-50 to-blue-100">
       <div className="bg-white rounded-2xl shadow-lg p-3 sm:p-8 w-full max-w-screen-xl px-2 sm:px-8 mx-auto my-3 sm:my-8">
         <div className="flex items-center justify-between mb-4 sm:mb-8">
           <h2 className="text-lg sm:text-2xl font-bold text-gray-800">Chats</h2>
@@ -371,7 +372,7 @@ function ChatPage({
         </div>
 
         {/* Messages - scrollable, fills available space, with bottom padding for input/nav */}
-        <div className={`flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full ${chatMessages.length > 0 ? 'pb-20' : ''}`} style={{scrollBehavior:'smooth'}}>
+        <div className={`flex-1 flex flex-col px-1 md:px-8 py-4 space-y-2 md:space-y-[35px] overflow-y-auto max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full ${chatMessages.length > 0 ? 'pb-20' : ''}`} style={{scrollBehavior:'smooth'}}>
           {/* Show filler content when no messages */}
           {chatMessages.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center min-h-[60vh] space-y-6 py-12 mt-18 md:mt-20">
@@ -484,10 +485,10 @@ function ChatPage({
 
   // Auto-scroll to bottom when chatMessages changes
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (selectedChat && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [chatMessages, typing]);
+  }, [chatMessages, typing, selectedChat]);
 
   // When selecting a chat, set chatMessages to the messages of the selected conversation from allConversations
   React.useEffect(() => {
@@ -523,6 +524,13 @@ function ChatPage({
 
     return () => clearTimeout(timeoutId);
   }, [allConversations]);
+
+  // Scroll to top when chat list page is shown
+  useEffect(() => {
+    if (!selectedChat) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedChat]);
 
   // Memoize the messages rendering to prevent unnecessary re-renders
   const renderedMessages = useMemo(() => {
