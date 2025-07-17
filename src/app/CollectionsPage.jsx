@@ -15,7 +15,7 @@ function CollectionsPage({
   setNewCollectionDescription,
 }) {
   const renderCollectionsList = () => (
-    <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-8 w-full max-w-6xl mx-auto my-4 sm:my-8 border border-white/20">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-10">
           <div>
@@ -112,7 +112,7 @@ function CollectionsPage({
     if (!selectedCollection) return renderCollectionsList();
 
     return (
-      <div className="flex flex-col min-h-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="flex flex-col min-h-screen flex-1 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         {/* Collection Header */}
         <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-lg px-3 sm:px-6 py-3 sm:py-4 border-b border-white/20">
           <div className="max-w-6xl mx-auto flex items-center">
